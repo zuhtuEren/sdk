@@ -31,6 +31,7 @@ EOF
 )
 
 SILENT="${SILENT:-0}"
+NEEDS_RELOGIN=0
 
 parse_flags() {
     while [ "$#" -gt 0 ]; do
@@ -105,37 +106,56 @@ fail_task() {
     printf "${CLEAR_LAST_MSG}%s\n" "${RED}✘ ${text}... [FAILED]${NO_COLOR}" >&2
 }
 
+check_host() {
+    local pretty_name="unknown"
+    if [ -r /etc/os-release ]; then
+        pretty_name="$(. /etc/os-release && echo "${PRETTY_NAME:-unknown}")"
+    fi
+    info "Host: ${pretty_name} ($(uname -m), kernel $(uname -r))"
+
+    if ! has apparmor_parser; then
+        warn "apparmor_parser is not found, 'task permissions' will fail. Install it with: sudo apt install apparmor"
+    fi
+}
+
 check_requirements() {
     start_task requirements
     for i in "curl" "git" "sudo"; do
         if ! has "$i"; then
-            echo "$i must be installed to start the setup! For Help: $DOCS_URL/sdk"
-            fail_task
+            fail_task requirements
+            error "$i must be installed to start the setup! For Help: $DOCS_URL/sdk"
             return 1
         fi
     done
-    success
     end_task requirements
 }
 
 install_docker() {
     start_task docker
-    has docker && success || { curl -fsSL https://get.docker.com | sh && success || fail_task; }
-    end_task docker
+    if has docker; then
+        end_task docker
+    elif curl -fsSL https://get.docker.com | sh; then
+        end_task docker
+    else
+        fail_task docker
+        return 1
+    fi
 }
 
 set_docker_perms() {
     start_task docker-permissions
 
     if ! has docker; then
-        error "Docker is not found, permissions could not set."
-        fail_task
-    elif id -nG "$USER" | grep -qwv "docker"; then
-        info "sudo groupadd docker && sudo usermod -aG docker $USER"
-        sudo groupadd docker || true
-        sudo usermod -aG docker $USER || true
-        warn "You should log out and log back in so that your docker group membership is re-evaluated."
-        success
+        fail_task docker-permissions
+        error "Docker is not found, permissions could not be set."
+        return 1
+    fi
+
+    local -r user="${USER:-$(id -un)}"
+    if ! id -nG "$user" | tr ' ' '\n' | grep -qx "docker"; then
+        sudo groupadd -f docker
+        sudo usermod -aG docker "$user"
+        NEEDS_RELOGIN=1
     fi
 
     end_task docker-permissions
@@ -143,8 +163,14 @@ set_docker_perms() {
 
 install_devbox() {
     start_task devbox
-    has "devbox" && success || { curl -fsSL https://get.jetify.com/devbox | bash && success || fail_task; }
-    end_task devbox
+    if has "devbox"; then
+        end_task devbox
+    elif curl -fsSL https://get.jetify.com/devbox | bash; then
+        end_task devbox
+    else
+        fail_task devbox
+        return 1
+    fi
 }
 
 intro_msg() {
@@ -156,6 +182,10 @@ intro_msg() {
 
 next_steps_msg() {
     printf "\n"
+    if [ "$NEEDS_RELOGIN" -eq 1 ]; then
+        warn "You were added to the docker group. Log out and log back in so that the membership is re-evaluated."
+        printf "\n"
+    fi
     header "What's the next?"
     plain "  1. ${BOLD}Learn how to build 🌍 a new world${NO_COLOR}"
     plain "     ${GREY}Read the docs at ${UNDERLINE}${BLUE}${DOCS_URL}${NO_COLOR}"
@@ -167,6 +197,7 @@ next_steps_msg() {
 main() {
     intro_msg
     delay 3
+    check_host
     check_requirements
     install_docker
     set_docker_perms
