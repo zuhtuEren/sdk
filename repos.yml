@@ -37,7 +37,7 @@ repositories:
 
   src/ti-img-rogue-umlibs:
     type: git
-    url: https://git.ti.com/git/graphics/ti-img-rogue-umlibs.git
+    url: https://github.com/TexasInstruments/ti-img-rogue-umlibs.git
     version: linuxws/scarthgap/k6.12/25.2.6850647
 
   src/cc33xx-fw:

@@ -1,0 +1,6 @@
+# git.ti.com rejects gzip-compressed request bodies (HTTP 501), which git
+# sends for any fetch request larger than 1KB, e.g. when all 24 branches of
+# ti-img-rogue-umlibs are requested by `git clone --mirror` in bitbake.
+# The GitHub mirror serves the same branches and commits.
+[url "https://github.com/TexasInstruments/ti-img-rogue-umlibs.git"]
+	insteadOf = https://git.ti.com/git/graphics/ti-img-rogue-umlibs.git

@@ -16,6 +16,7 @@ yocto/**
 !.distrobox/.profile
 !.distrobox/.bashrc
 !.distrobox/.bash_aliases
+!.distrobox/.gitconfig
 !.distrobox/.ssh
 !.distrobox/.ssh/config
 !.distrobox/.bash_completion.d
